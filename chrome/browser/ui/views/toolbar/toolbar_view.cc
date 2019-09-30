@@ -469,7 +469,7 @@ void ToolbarView::Init() {
 #elif BUILDFLAG(IS_CHROMEOS_LACROS)
   show_avatar_toolbar_button = !profiles::IsManagedGuestSession();
 #endif
-  avatar_->SetVisible(show_avatar_toolbar_button);
+  avatar_->SetVisible(false);
 
   if (base::FeatureList::IsEnabled(features::kResponsiveToolbar)) {
     overflow_button_ =
