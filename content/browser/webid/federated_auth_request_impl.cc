@@ -1881,7 +1881,7 @@ void FederatedAuthRequestImpl::ShowErrorDialog(
       base::BindOnce(&FederatedAuthRequestImpl::CompleteRequestWithError,
                      weak_ptr_factory_.GetWeakPtr()));
   absl::optional<TokenError> token_error =
-      error ? absl::make_optional<TokenError>(error->code, error->url)
+      error ? absl::make_optional<TokenError>({error->code, error->url})
             : absl::nullopt;
 
   // TODO(crbug.com/1485710): Refactor IdentityCredentialTokenError

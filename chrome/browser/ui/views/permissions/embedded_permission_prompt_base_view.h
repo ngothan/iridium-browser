@@ -72,6 +72,7 @@ class EmbeddedPermissionPromptBaseView : public PermissionPromptBaseView {
   struct RequestLineConfiguration {
     const raw_ptr<const gfx::VectorIcon> icon;
     std::u16string message;
+    RequestLineConfiguration(auto i, auto m) : icon(i), message(m) { }
   };
 
   struct ButtonConfiguration {

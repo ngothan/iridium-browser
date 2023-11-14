@@ -8567,7 +8567,7 @@ void RenderFrameHostImpl::SendFencedFrameReportingBeacon(
   for (const blink::FencedFrame::ReportingDestination& destination :
        destinations) {
     SendFencedFrameReportingBeaconInternal(
-        DestinationEnumEvent(event_type, event_data), destination,
+        DestinationEnumEvent{event_type, event_data}, destination,
         /*from_renderer=*/true, attribution_reporting_runtime_features,
         GetFrameTreeNodeId());
   }
@@ -8603,7 +8603,7 @@ void RenderFrameHostImpl::SendFencedFrameReportingBeaconToCustomURL(
   }
 
   SendFencedFrameReportingBeaconInternal(
-      DestinationURLEvent(destination_url),
+      DestinationURLEvent{destination_url},
       blink::FencedFrame::ReportingDestination::kBuyer,
       /*from_renderer=*/true, attribution_reporting_runtime_features,
       GetFrameTreeNodeId());
@@ -8703,8 +8703,8 @@ void RenderFrameHostImpl::MaybeSendFencedFrameAutomaticReportingBeacon(
         data = info->data;
       }
       initiator_rfh->SendFencedFrameReportingBeaconInternal(
-          DestinationEnumEvent(blink::kFencedFrameTopNavigationBeaconType,
-                               data),
+          DestinationEnumEvent{blink::kFencedFrameTopNavigationBeaconType,
+                               data},
           destination,
           /*from_renderer=*/false, attribution_reporting_features,
           GetFrameTreeNodeId(), navigation_request.GetNavigationId());
@@ -8717,8 +8717,8 @@ void RenderFrameHostImpl::MaybeSendFencedFrameAutomaticReportingBeacon(
     for (blink::FencedFrame::ReportingDestination destination :
          info->destinations) {
       initiator_rfh->SendFencedFrameReportingBeaconInternal(
-          DestinationEnumEvent(blink::kFencedFrameTopNavigationBeaconType,
-                               info->data),
+          DestinationEnumEvent{blink::kFencedFrameTopNavigationBeaconType,
+                               info->data},
           destination,
           /*from_renderer=*/false, info->attribution_reporting_runtime_features,
           GetFrameTreeNodeId(), navigation_request.GetNavigationId());
