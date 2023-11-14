@@ -1,0 +1,216 @@
+// Copyright 2020 The Chromium Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+package org.chromium.chrome.browser.homepage;
+
+import static org.mockito.Mockito.doReturn;
+
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.MockitoAnnotations;
+import org.robolectric.annotation.Config;
+import org.robolectric.annotation.Implementation;
+import org.robolectric.annotation.Implements;
+
+import org.chromium.base.test.BaseRobolectricTestRunner;
+import org.chromium.chrome.browser.common.ChromeUrlConstants;
+import org.chromium.chrome.browser.flags.ChromeFeatureList;
+import org.chromium.chrome.browser.new_tab_url.DseNewTabUrlManager;
+import org.chromium.chrome.browser.partnercustomizations.PartnerBrowserCustomizations;
+import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
+import org.chromium.chrome.browser.preferences.SharedPreferencesManager;
+import org.chromium.chrome.browser.profiles.Profile;
+import org.chromium.chrome.browser.profiles.ProfileManager;
+import org.chromium.chrome.browser.search_engines.TemplateUrlServiceFactory;
+import org.chromium.chrome.test.util.browser.Features;
+import org.chromium.chrome.test.util.browser.Features.EnableFeatures;
+import org.chromium.components.search_engines.TemplateUrl;
+import org.chromium.components.search_engines.TemplateUrlService;
+import org.chromium.url.GURL;
+import org.chromium.url.JUnitTestGURLs;
+
+/** Unit tests for {@link HomepageManager}. */
+@RunWith(BaseRobolectricTestRunner.class)
+@Config(shadows = {HomepageManagerTest.ShadowHomepagePolicyManager.class,
+                HomepageManagerTest.ShadowPartnerBrowserCustomizations.class})
+public class HomepageManagerTest {
+    /** Shadow for {@link HomepagePolicyManager}. */
+    @Implements(HomepagePolicyManager.class)
+    public static class ShadowHomepagePolicyManager {
+        static GURL sHomepageUrl;
+
+        @Implementation
+        public static boolean isHomepageManagedByPolicy() {
+            return true;
+        }
+
+        @Implementation
+        public static GURL getHomepageUrl() {
+            return sHomepageUrl;
+        }
+    }
+
+    @Implements(PartnerBrowserCustomizations.class)
+    static class ShadowPartnerBrowserCustomizations {
+        private static PartnerBrowserCustomizations sPartnerBrowserCustomizations;
+
+        @Implementation
+        public static PartnerBrowserCustomizations getInstance() {
+            return sPartnerBrowserCustomizations;
+        }
+
+        static void setPartnerBrowserCustomizations(
+                PartnerBrowserCustomizations partnerBrowserCustomizations) {
+            sPartnerBrowserCustomizations = partnerBrowserCustomizations;
+        }
+    }
+
+    @Rule
+    public Features.JUnitProcessor mFeaturesProcessor = new Features.JUnitProcessor();
+
+    @Mock
+    private PartnerBrowserCustomizations mPartnerBrowserCustomizations;
+
+    @Before
+    public void setUp() {
+        MockitoAnnotations.initMocks(this);
+        ShadowPartnerBrowserCustomizations.setPartnerBrowserCustomizations(
+                mPartnerBrowserCustomizations);
+    }
+
+    @After
+    public void tearDown() {
+        ShadowHomepagePolicyManager.sHomepageUrl = null;
+    }
+
+    @Test
+    public void testIsHomepageNonNtp() {
+        ShadowHomepagePolicyManager.sHomepageUrl = GURL.emptyGURL();
+        Assert.assertFalse(
+                "Empty string should fall back to NTP.", HomepageManager.isHomepageNonNtp());
+
+        ShadowHomepagePolicyManager.sHomepageUrl = JUnitTestGURLs.EXAMPLE_URL;
+        Assert.assertTrue("Random web page is not the NTP.", HomepageManager.isHomepageNonNtp());
+
+        ShadowHomepagePolicyManager.sHomepageUrl = JUnitTestGURLs.NTP_NATIVE_URL;
+        Assert.assertFalse("NTP should be considered the NTP.", HomepageManager.isHomepageNonNtp());
+    }
+
+    @Test
+    public void testGetDefaultHomepageGurlPreferenceKeysMigration() {
+        Mockito.doNothing()
+                .when(mPartnerBrowserCustomizations)
+                .setPartnerHomepageListener(ArgumentMatchers.any());
+        Mockito.doReturn(false)
+                .when(mPartnerBrowserCustomizations)
+                .isHomepageProviderAvailableAndEnabled();
+
+        SharedPreferencesManager.getInstance().writeString(
+                ChromePreferenceKeys.DEPRECATED_HOMEPAGE_PARTNER_CUSTOMIZED_DEFAULT_URI, null);
+        SharedPreferencesManager.getInstance().writeString(
+                ChromePreferenceKeys.HOMEPAGE_PARTNER_CUSTOMIZED_DEFAULT_GURL, null);
+        Assert.assertEquals(
+                ChromeUrlConstants.nativeNtpGurl(), HomepageManager.getDefaultHomepageGurl());
+
+        final GURL blueUrl = JUnitTestGURLs.BLUE_1;
+        SharedPreferencesManager.getInstance().writeString(
+                ChromePreferenceKeys.DEPRECATED_HOMEPAGE_PARTNER_CUSTOMIZED_DEFAULT_URI,
+                blueUrl.getSpec());
+        SharedPreferencesManager.getInstance().writeString(
+                ChromePreferenceKeys.HOMEPAGE_PARTNER_CUSTOMIZED_DEFAULT_GURL, null);
+        Assert.assertEquals(blueUrl, HomepageManager.getDefaultHomepageGurl());
+
+        final GURL redUrl = JUnitTestGURLs.RED_1;
+        final String serializedRedGurl = redUrl.serialize();
+        SharedPreferencesManager.getInstance().writeString(
+                ChromePreferenceKeys.DEPRECATED_HOMEPAGE_PARTNER_CUSTOMIZED_DEFAULT_URI, null);
+        SharedPreferencesManager.getInstance().writeString(
+                ChromePreferenceKeys.HOMEPAGE_PARTNER_CUSTOMIZED_DEFAULT_GURL, serializedRedGurl);
+        Assert.assertEquals(redUrl, HomepageManager.getDefaultHomepageGurl());
+
+        final GURL url1 = JUnitTestGURLs.URL_1;
+        final GURL url2 = JUnitTestGURLs.URL_2;
+        final String serializedGurl2 = url2.serialize();
+        SharedPreferencesManager.getInstance().writeString(
+                ChromePreferenceKeys.DEPRECATED_HOMEPAGE_PARTNER_CUSTOMIZED_DEFAULT_URI,
+                url1.getSpec());
+        SharedPreferencesManager.getInstance().writeString(
+                ChromePreferenceKeys.HOMEPAGE_PARTNER_CUSTOMIZED_DEFAULT_GURL, serializedGurl2);
+        Assert.assertEquals(url2, HomepageManager.getDefaultHomepageGurl());
+    }
+
+    @Test
+    public void testGetPrefHomepageCustomGurlPreferenceKeysMigration() {
+        HomepageManager homepageManager = HomepageManager.getInstance();
+
+        SharedPreferencesManager.getInstance().writeString(
+                ChromePreferenceKeys.DEPRECATED_HOMEPAGE_CUSTOM_URI, null);
+        SharedPreferencesManager.getInstance().writeString(
+                ChromePreferenceKeys.HOMEPAGE_CUSTOM_GURL, null);
+        Assert.assertTrue(homepageManager.getPrefHomepageCustomGurl().isEmpty());
+
+        final GURL blueUrl = JUnitTestGURLs.BLUE_1;
+        SharedPreferencesManager.getInstance().writeString(
+                ChromePreferenceKeys.DEPRECATED_HOMEPAGE_CUSTOM_URI, blueUrl.getSpec());
+        SharedPreferencesManager.getInstance().writeString(
+                ChromePreferenceKeys.HOMEPAGE_CUSTOM_GURL, null);
+        Assert.assertEquals(blueUrl, homepageManager.getPrefHomepageCustomGurl());
+
+        final GURL redUrl = JUnitTestGURLs.RED_1;
+        SharedPreferencesManager.getInstance().writeString(
+                ChromePreferenceKeys.DEPRECATED_HOMEPAGE_CUSTOM_URI, null);
+        SharedPreferencesManager.getInstance().writeString(
+                ChromePreferenceKeys.HOMEPAGE_CUSTOM_GURL, redUrl.serialize());
+        Assert.assertEquals(redUrl, homepageManager.getPrefHomepageCustomGurl());
+
+        final GURL url1 = JUnitTestGURLs.URL_1;
+        SharedPreferencesManager.getInstance().writeString(
+                ChromePreferenceKeys.DEPRECATED_HOMEPAGE_CUSTOM_URI, redUrl.serialize());
+        SharedPreferencesManager.getInstance().writeString(
+                ChromePreferenceKeys.HOMEPAGE_CUSTOM_GURL, url1.serialize());
+        Assert.assertEquals(url1, homepageManager.getPrefHomepageCustomGurl());
+    }
+
+    @Test
+    @EnableFeatures({ChromeFeatureList.NEW_TAB_SEARCH_ENGINE_URL_ANDROID})
+    public void testOverrideNtpHomepage() {
+        ShadowHomepagePolicyManager.sHomepageUrl = GURL.emptyGURL();
+
+        Assert.assertNull(DseNewTabUrlManager.getDSENewTabUrl(null));
+        Assert.assertEquals(ChromeUrlConstants.nativeNtpGurl(), HomepageManager.getHomepageGurl());
+
+        TemplateUrlService templateUrlService = Mockito.mock(TemplateUrlService.class);
+        initializeProfile(false, templateUrlService);
+
+        Assert.assertEquals(JUnitTestGURLs.SEARCH_URL.getSpec(),
+                DseNewTabUrlManager.getDSENewTabUrl(templateUrlService));
+        Assert.assertEquals(JUnitTestGURLs.SEARCH_URL, HomepageManager.getHomepageGurl());
+
+        ProfileManager.resetForTesting();
+    }
+
+    private void initializeProfile(boolean isOffTheRecord, TemplateUrlService templateUrlService) {
+        Profile profile = Mockito.mock(Profile.class);
+        doReturn(isOffTheRecord).when(profile).isOffTheRecord();
+
+        TemplateUrl templateUrl = Mockito.mock(TemplateUrl.class);
+        doReturn(templateUrl).when(templateUrlService).getDefaultSearchEngineTemplateUrl();
+        doReturn(JUnitTestGURLs.SEARCH_URL.getSpec()).when(templateUrl).getNewTabURL();
+
+        Profile.setLastUsedProfileForTesting(profile);
+        TemplateUrlServiceFactory.setInstanceForTesting(templateUrlService);
+        ProfileManager.onProfileAdded(profile);
+
+        SharedPreferencesManager.getInstance().writeBoolean(
+                ChromePreferenceKeys.IS_DSE_GOOGLE, false);
+        Assert.assertFalse(DseNewTabUrlManager.isDefaultSearchEngineGoogle());
+    }
+}

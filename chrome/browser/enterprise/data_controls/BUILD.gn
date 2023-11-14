@@ -1,0 +1,48 @@
+# Copyright 2023 The Chromium Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//components/enterprise/buildflags/buildflags.gni")
+
+assert(enterprise_data_controls)
+
+source_set("data_controls") {
+  sources = [
+    "chrome_dlp_rules_manager.cc",
+    "chrome_dlp_rules_manager.h",
+    "dlp_rules_manager_base.h",
+  ]
+
+  public_deps = [
+    "//components/enterprise/data_controls",
+    "//components/enterprise/data_controls:features",
+  ]
+
+  deps = [
+    "//base",
+    "//components/keyed_service/core",
+    "//components/policy/core/browser",
+    "//components/url_matcher",
+    "//third_party/abseil-cpp:absl",
+    "//url",
+  ]
+}
+
+source_set("test_support") {
+  testonly = true
+  public_deps = [
+    ":data_controls",
+    "//base",
+    "//components/policy/core/browser",
+    "//components/policy/core/common:common_constants",
+    "//components/prefs",
+    "//testing/gtest",
+    "//third_party/abseil-cpp:absl",
+  ]
+}
+
+source_set("unit_tests") {
+  testonly = true
+
+  deps = [ "//components/enterprise/data_controls:unit_tests" ]
+}
